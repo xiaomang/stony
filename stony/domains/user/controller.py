@@ -4,7 +4,7 @@ from typing import Annotated
 
 import bcrypt
 from bson import ObjectId
-from litestar import Controller, get, post
+from litestar import Controller, delete, get, post
 from litestar.di import NamedDependency
 from litestar.exceptions import HTTPException
 from litestar.pagination import OffsetPagination
@@ -52,6 +52,18 @@ class UserController(Controller):
             limit=limit,
         )
 
+    @get("/{id:str}", summary="获取用户详情")
+    async def find_one(
+        self,
+        id: str,
+        db: NamedDependency[AsyncIOMotorDatabase],
+    ) -> UserFindResponse:
+        query = {"_id": ObjectId(id)}
+        doc = await db.users.find_one(query)
+        if not doc:
+            raise HTTPException(status_code=404, detail="用户不存在")
+        return parse_user(doc)
+
     @post(summary="创建用户")
     async def create(
         self,
@@ -81,3 +93,16 @@ class UserController(Controller):
             created_at=doc["created_at"],
             client_ip=doc["client_ip"],
         )
+
+    @delete("/{id:str}", summary="删除用户")
+    async def delete(
+        self,
+        id: str,
+        db: NamedDependency[AsyncIOMotorDatabase],
+    ) -> None:
+        query = {"_id": ObjectId(id)}
+        doc = await db.users.find_one(query)
+        if not doc:
+            raise HTTPException(status_code=404, detail="用户不存在")
+        await db.users.delete_one(query)
+        return None
